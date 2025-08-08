@@ -1,0 +1,319 @@
+<!doctype html>
+
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>웹 낱말 점수 계산기</title>
+  <style>
+    :root { --fg:#0f172a; --bg:#fff; --muted:#64748b; --accent:#2563eb; --soft:#f1f5f9; }
+    *{box-sizing:border-box} body{margin:0; font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans KR", Apple SD Gothic Neo, Arial, "Apple Color Emoji", "Segoe UI Emoji"; color:var(--fg); background:var(--bg)}
+    header{padding:20px 16px; border-bottom:1px solid #e2e8f0}
+    header h1{margin:0; font-size:20px}
+    main{max-width:980px; margin:0 auto; padding:20px 16px}
+    .card{background:#fff; border:1px solid #e2e8f0; border-radius:16px; padding:16px; box-shadow:0 1px 2px rgba(0,0,0,.04)}
+    .row{display:flex; gap:12px; flex-wrap:wrap}
+    .row > *{flex:1 1 240px}
+    label{display:block; font-size:12px; color:var(--muted); margin-bottom:6px}
+    input[type=text]{width:100%; padding:12px 14px; border:1px solid #cbd5e1; border-radius:12px; font-size:16px}
+    button{padding:10px 14px; border:1px solid #cbd5e1; border-radius:12px; background:var(--soft); cursor:pointer}
+    button.primary{background:var(--accent); border-color:var(--accent); color:#fff}
+    .hint{font-size:12px; color:var(--muted)}
+    table{width:100%; border-collapse:collapse; margin-top:12px}
+    th,td{border:1px solid #e2e8f0; padding:8px 10px; text-align:center}
+    th{background:#f8fafc}
+    .total{font-size:22px; font-weight:700; margin-top:12px}
+    .chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:6px}
+    .chip{background:#eef2ff; color:#3730a3; border-radius:999px; padding:6px 10px; font-size:12px}
+    .muted{color:var(--muted)}
+    .warn{color:#b91c1c}
+    footer{padding:24px 16px; color:var(--muted); font-size:12px; text-align:center}
+      .badge{display:inline-block; padding:8px 12px; border-radius:999px; font-weight:700}
+    .badge.red{background:#fee2e2; color:#991b1b}
+    .badge.yellow{background:#fef9c3; color:#854d0e}
+    .badge.green{background:#dcfce7; color:#166534}
+      .symgrid{display:grid; grid-template-columns:repeat(auto-fit, minmax(48px, 1fr)); gap:8px; margin-top:8px}
+    .symbtn{display:flex; align-items:center; justify-content:center; font-size:22px; padding:10px; border:1px solid #cbd5e1; border-radius:12px; background:#f8fafc; cursor:pointer; user-select:none}
+    .symbtn:hover{background:#eef2ff; border-color:#94a3b8}
+    .symhint{font-size:12px; color:var(--muted); margin-top:4px}
+    .toast{position:fixed; left:50%; transform:translateX(-50%); bottom:20px; background:#111827; color:#fff; padding:10px 14px; border-radius:10px; opacity:0; transition:opacity .2s ease; pointer-events:none; z-index:9999}
+    .toast.show{opacity:1}
+  </style>
+</head>
+<body>
+  <header>
+    <h1>웹 낱말 점수 계산기 · 5글자 & 기호 지원</h1>
+  </header>
+  <main>
+    <section class="card">
+      <div class="row">
+        <div>
+          <label for="word">단어/문자열 입력 (한글 5글자 + 기호는 어디든)</label>
+          <input id="word" type="text" placeholder="예: 횃불의의미★?" />
+          <div class="hint">한글은 최대 5글자까지만 계산하고, 기호는 몇 개든 입력 가능해요. (상위 5개 기호만 점수 집계)</div>
+        </div>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <button class="primary" onclick="calc()">계산하기</button>
+        <button onclick="resetAll()">초기화</button>
+      </div><div style="margin-top:16px">
+    <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap">
+      <h3 style="margin:0; font-size:16px">특수기호 복사</h3>
+      <div class="symhint">원하는 기호를 클릭하면 클립보드에 복사돼요. (붙여넣기 Ctrl/⌘+V)</div>
+    </div>
+    <div class="symgrid" id="symGrid">
+      <!-- buttons injected -->
+    </div>
+  </div>
+</section>
+
+<!-- 게임 점수 입력 -->
+<section class="card" style="margin-top:12px">
+  <div class="row">
+    <div>
+      <label for="gameScore">게임 점수 (현장 포인트)</label>
+      <input id="gameScore" type="number" placeholder="예: 1019" inputmode="numeric" />
+      <div class="hint">비율 = 게임점수 ÷ 계산점수 (아래 결과에서 신호등으로 표시)</div>
+    </div>
+  </div>
+  <div id="ratioBox" style="display:none; margin-top:10px">
+    <div id="ratioBadge" class="badge"></div>
+  </div>
+</section>
+
+<section class="card" style="margin-top:16px">
+  <h3 style="margin:6px 0 10px">분석 결과</h3>
+  <div id="limits" class="hint muted"></div>
+  <div class="chips" id="symbols"></div>
+  <table id="resultTable" style="display:none">
+    <thead>
+      <tr>
+        <th>순번</th>
+        <th>글자</th>
+        <th>초성</th>
+        <th>중성</th>
+        <th>종성</th>
+        <th>초성점수</th>
+        <th>중성점수</th>
+        <th>종성점수</th>
+        <th>합계</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div id="symScoreWrap" style="margin-top:10px; display:none">
+    <div class="hint">기호 점수</div>
+    <div id="symScoreList" class="chips"></div>
+  </div>
+  <div class="total" id="total" style="display:none"></div>
+</section>
+
+<section class="card" style="margin-top:16px">
+  <details>
+    <summary>점수 규칙 요약 보기</summary>
+    <div style="margin-top:8px">
+      <div class="hint">각 묶음의 첫 문자 1점, 같은 문자 2개를 합치면 다음 문자(점수×2). 묶음 간 합성 불가.</div>
+      <ul>
+        <li>자음박스1-묶음1: ㄱ→ㄴ→ㄷ→ㄹ→ㅁ→ㅂ→ㅅ (1,2,4,8,16,32,64)</li>
+        <li>자음박스1-묶음2: ㄲ→ㄸ→ㅃ→ㅆ→ㅉ (1,2,4,8,16)</li>
+        <li>자음박스2-단일: ㅇ→ㅈ→ㅊ→ㅋ→ㅌ→ㅍ→ㅎ (1,2,4,8,16,32,64)</li>
+        <li>자음박스2-겹1: ㄱㅅ→ㄴㅈ→ㄴㅎ (1,2,4)</li>
+        <li>자음박스2-겹2: ㄹㄱ→ㄹㅁ→ㄹㅂ→ㄹㅍ→ㄹㅅ→ㅂㅅ (1,2,4,8,16,32)</li>
+        <li>모음박스1-1: ㅏ→ㅑ→ㅓ→ㅕ (1,2,4,8)</li>
+        <li>모음박스1-2: ㅐ→ㅒ→ㅔ→ㅖ (1,2,4,8)</li>
+        <li>모음박스2-1: ㅗ→ㅛ→ㅜ→ㅠ→ㅡ→ㅣ (1,2,4,8,16,32)</li>
+        <li>모음박스2-2: ㅢ→ㅟ→ㅝ→ㅞ→ㅚ→ㅘ→ㅙ (1,2,4,8,16,32,64)</li>
+        <li>특수기호-묶음1: ,→.→⋯→!→?→-→~→[→] (1,2,4,8,16,32,64,128,256)</li>
+        <li>특수기호-묶음2: ◆→♦→♠→♣→♥→★ (1,2,4,8,16,32)</li>
+      </ul>
+    </div>
+  </details>
+</section>
+
+  </main>
+  <footer>© 낱말 점수 계산기 – 브라우저 전용</footer><script>
+// ===== Hangul decomposition constants =====
+const HANGUL_BASE = 0xAC00;
+const CHO = ["ㄱ","ㄲ","ㄴ","ㄷ","ㄸ","ㄹ","ㅁ","ㅂ","ㅃ","ㅅ","ㅆ","ㅇ","ㅈ","ㅉ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+const JUNG = ["ㅏ","ㅐ","ㅑ","ㅒ","ㅓ","ㅔ","ㅕ","ㅖ","ㅗ","ㅘ","ㅙ","ㅚ","ㅛ","ㅜ","ㅝ","ㅞ","ㅟ","ㅠ","ㅡ","ㅢ","ㅣ"];
+const JONG = ["", "ㄱ","ㄲ","ㄱㅅ","ㄴ","ㄴㅈ","ㄴㅎ","ㄷ","ㄹ","ㄹㄱ","ㄹㅁ","ㄹㅂ","ㄹㅅ","ㄹㅌ","ㄹㅍ","ㄹㅎ","ㅁ","ㅂ","ㅂㅅ","ㅅ","ㅆ","ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"];
+
+function decompose(syllable){
+  const code = syllable.charCodeAt(0);
+  const idx = code - HANGUL_BASE;
+  if(idx < 0 || idx > 11171) return null; // not Hangul syllable
+  const cho = Math.floor(idx / 588);
+  const jung = Math.floor((idx % 588) / 28);
+  const jong = idx % 28;
+  return { cho: CHO[cho], jung: JUNG[jung], jong: JONG[jong] };
+}
+
+// ===== Scoring tables built from sequences (first=1, then ×2) =====
+function seqToMap(seq){ const m={}; seq.forEach((ch,i)=> m[ch] = 2**i ); return m; }
+const SCORES = {
+  // 자음박스1-묶음1
+  ...seqToMap(["ㄱ","ㄴ","ㄷ","ㄹ","ㅁ","ㅂ","ㅅ"]),
+  // 자음박스1-묶음2
+  ...seqToMap(["ㄲ","ㄸ","ㅃ","ㅆ","ㅉ"]),
+  // 자음박스2-단일
+  ...seqToMap(["ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"]),
+  // 자음박스2-겹받침 1
+  ...seqToMap(["ㄱㅅ","ㄴㅈ","ㄴㅎ"]),
+  // 자음박스2-겹받침 2
+  ...seqToMap(["ㄹㄱ","ㄹㅁ","ㄹㅂ","ㄹㅍ","ㄹㅅ","ㅂㅅ"]),
+  // 모음박스1-묶음1
+  ...seqToMap(["ㅏ","ㅑ","ㅓ","ㅕ"]),
+  // 모음박스1-묶음2
+  ...seqToMap(["ㅐ","ㅒ","ㅔ","ㅖ"]),
+  // 모음박스2-묶음1
+  ...seqToMap(["ㅗ","ㅛ","ㅜ","ㅠ","ㅡ","ㅣ"]),
+  // 모음박스2-묶음2
+  ...seqToMap(["ㅢ","ㅟ","ㅝ","ㅞ","ㅚ","ㅘ","ㅙ"]),
+  // 특수기호 묶음1
+  ...seqToMap([",",".","⋯","!","?","-","~","[","]"]),
+  // 특수기호 묶음2
+  ...seqToMap(["◆","♦","♠","♣","♥","★"]),
+};
+
+function scoreOf(token){
+  // token can be jamo (초/중/종) or symbol; unknown → 0
+  return SCORES[token] ?? 0;
+}
+
+function calc(){
+  const input = document.getElementById('word').value || '';
+  const chars = Array.from(input);
+
+  // Separate hangul syllables vs symbols; cap: 5 hangul + 5 symbols
+  const hangul = []; const symbols = [];
+  for(const ch of chars){
+    const d = decompose(ch);
+    if(d){ if(hangul.length < 5) hangul.push({ch, ...d}); }
+    else { if(symbols.length < 5) symbols.push(ch); }
+  }
+
+  // Render limits info
+  const limits = document.getElementById('limits');
+  const notes = [];
+  if(hangul.length < chars.filter(c=>decompose(c)).length) notes.push('한글 5글자까지만 계산했어요.');
+  if(symbols.length < chars.filter(c=>!decompose(c)).length) notes.push('기호는 상위 5개만 점수에 포함했어요.');
+  limits.textContent = notes.join(' ');
+
+  // Render table rows
+  const tbody = document.querySelector('#resultTable tbody');
+  tbody.innerHTML = '';
+  let total = 0;
+  hangul.forEach((h, idx)=>{
+    const sc = scoreOf(h.cho) + scoreOf(h.jung) + scoreOf(h.jong);
+    total += sc;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${idx+1}</td>
+      <td>${h.ch}</td>
+      <td>${h.cho||''}</td>
+      <td>${h.jung||''}</td>
+      <td>${h.jong||''}</td>
+      <td>${scoreOf(h.cho)}</td>
+      <td>${scoreOf(h.jung)}</td>
+      <td>${scoreOf(h.jong)}</td>
+      <td>${sc}</td>`;
+    tbody.appendChild(tr);
+  });
+  document.getElementById('resultTable').style.display = hangul.length? 'table':'none';
+
+  // Symbols chips + scores
+  const symWrap = document.getElementById('symScoreWrap');
+  const symList = document.getElementById('symScoreList');
+  const symChips = document.getElementById('symbols');
+  symChips.innerHTML = '';
+  symList.innerHTML = '';
+  let symTotal = 0;
+  symbols.forEach(s=>{
+    const chip1 = document.createElement('div'); chip1.className='chip'; chip1.textContent = s;
+    symChips.appendChild(chip1);
+    const sc = scoreOf(s); symTotal += sc;
+    const chip2 = document.createElement('div'); chip2.className='chip'; chip2.textContent = `${s} = ${sc}`;
+    symList.appendChild(chip2);
+  });
+  symWrap.style.display = symbols.length? 'block':'none';
+  total += symTotal;
+
+  // Total
+  const totalDiv = document.getElementById('total');
+  totalDiv.textContent = `총 점수: ${total.toLocaleString()}점`;
+  totalDiv.style.display = (hangul.length || symbols.length)? 'block':'none';
+
+  // Ratio (게임 점수 ÷ 계산 점수) & signal light
+  const ratioBox = document.getElementById('ratioBox');
+  const ratioBadge = document.getElementById('ratioBadge');
+  const gameValRaw = document.getElementById('gameScore').value.trim();
+  if(gameValRaw && total>0){
+    const gameVal = Number(gameValRaw);
+    if(!Number.isNaN(gameVal)){
+      const r = gameVal / total;
+      let cls = 'red';
+      if(r >= 3.5) cls = 'green';
+      else if(r >= 2) cls = 'yellow';
+      ratioBadge.className = 'badge ' + cls;
+      ratioBadge.textContent = `게임점수 ${gameVal.toLocaleString()} ÷ 계산점수 ${total.toLocaleString()} = 비율 ${r.toFixed(1)}`;
+      ratioBox.style.display = 'block';
+    } else {
+      ratioBox.style.display = 'none';
+      ratioBadge.textContent = '';
+    }
+  } else {
+    ratioBox.style.display = 'none';
+    ratioBadge.textContent = '';
+  }
+}
+
+function resetAll(){
+  document.getElementById('word').value = '';
+  document.getElementById('resultTable').style.display = 'none';
+  document.getElementById('symScoreWrap').style.display = 'none';
+  document.getElementById('total').style.display = 'none';
+  document.getElementById('ratioBox').style.display = 'none';
+  document.getElementById('ratioBadge').textContent = '';
+  document.getElementById('symbols').innerHTML = '';
+  document.querySelector('#resultTable tbody').innerHTML = '';
+  document.getElementById('limits').textContent = '';
+}
+// ===== Symbols copy panel =====
+const SYMBOLS = ["◆","♦","♠","♣","♥","★",",",".","⋯","!","?","-","~","[","]"]; 
+function renderSymbols(){
+  const grid = document.getElementById('symGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  SYMBOLS.forEach(s => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'symbtn';
+    btn.title = s + ' 복사';
+    btn.setAttribute('aria-label', s + ' 복사');
+    btn.textContent = s;
+    btn.onclick = () => copySym(s);
+    grid.appendChild(btn);
+  });
+}
+function copySym(s){
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(s).then(()=> showToast(`${s} 복사됨`)).catch(()=> fallbackCopy(s));
+  } else { fallbackCopy(s); }
+}
+function fallbackCopy(text){
+  const ta = document.createElement('textarea');
+  ta.value = text; document.body.appendChild(ta); ta.select();
+  try{ document.execCommand('copy'); showToast(`${text} 복사됨`);}catch(e){ showToast('복사 실패'); }
+  document.body.removeChild(ta);
+}
+function showToast(msg){
+  const el = document.getElementById('toast');
+  if(!el) return; el.textContent = msg; el.classList.add('show');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(()=> el.classList.remove('show'), 1400);
+}
+// init
+renderSymbols();
+</script>  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+</body>
+</html>
