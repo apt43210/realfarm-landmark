@@ -183,10 +183,7 @@ const SCORES = {
   // 특수기호 묶음2
   ...seqToMap(["◆","♦","♠","♣","♥","★"]),
 };
-
-function scoreOf(token){
-  return SCORES[token] ?? 0;
-}
+function scoreOf(token){ return SCORES[token] ?? 0; }
 
 // ===== Symbols copy panel =====
 const SYMBOLS = ["◆","♦","♠","♣","♥","★",",",".","⋯","!","?","-","~","[","]"];
@@ -224,7 +221,7 @@ function showToast(msg){
 }
 
 // ===== Calculator =====
-let CALC_DONE = false; // 계산 완료 상태 추적
+let CALC_DONE = false; // 계산 완료 상태
 
 function calc(){
   const input = document.getElementById('wordInput').value || '';
@@ -239,7 +236,7 @@ function calc(){
     else { if(symbols.length < 5) symbols.push(item.c); }
   }
 
-  // limits note
+  // notes
   const limits = document.getElementById('limits');
   const notes = [];
   if(hangul.length < hangulAll.filter(x=>x.d).length) notes.push('한글 5글자까지만 계산했어요.');
@@ -271,7 +268,7 @@ function calc(){
   });
   document.getElementById('resultTable').style.display = hangul.length? 'table':'none';
 
-  // symbols chips + scores
+  // symbols
   const symWrap = document.getElementById('symScoreWrap');
   const symList = document.getElementById('symScoreList');
   const symChips = document.getElementById('symbols');
@@ -316,7 +313,7 @@ function calc(){
     ratioBadge.textContent = '';
   }
 
-  CALC_DONE = true; // 계산 완료 상태
+  CALC_DONE = true; // 계산 완료 플래그 on
 }
 
 function resetAll(){
@@ -330,51 +327,48 @@ function resetAll(){
   document.getElementById('limits').textContent = '';
   document.getElementById('ratioBox').style.display = 'none';
   document.getElementById('ratioBadge').textContent = '';
-  CALC_DONE = false;
+  CALC_DONE = false; // 플래그 off
 }
 
-// ===== Keyboard flow =====
-// - 단어칸 Enter → 점수칸으로 포커스 이동
-// - 점수칸 Enter → (미계산) 계산 / (계산됨) 초기화+단어칸 포커스
-// - 계산 완료 상태에서 문서 어디서든 Enter → 초기화+단어칸 포커스
+// ===== Keyboard flow (final) =====
+// - 단어칸 Enter → 새 라운드 시작(CALC_DONE=false) + 점수칸 포커스
+// - 점수칸 Enter → (계산 전) calc() / (계산 후) resetAll()+단어칸
+// - 어디서든 계산 완료 상태에서 Enter → resetAll()+단어칸
 document.addEventListener('DOMContentLoaded', function(){
   renderSymbols();
 
-  const wordInput = document.getElementById('wordInput');
+  const wordInput  = document.getElementById('wordInput');
   const scoreInput = document.getElementById('gameScore');
 
-  if(wordInput){
+  function focusWord(){ if(wordInput){ wordInput.focus(); wordInput.select?.(); } }
+
+  if (wordInput){
     wordInput.addEventListener('keydown', function(e){
       if(e.key === 'Enter'){
         e.preventDefault();
-        if(CALC_DONE){
-          resetAll(); wordInput.focus();
-        } else {
-          if(scoreInput) scoreInput.focus();
-        }
+        CALC_DONE = false;         // 새 라운드 시작
+        if (scoreInput) scoreInput.focus();
       }
     });
   }
 
-  if(scoreInput){
+  if (scoreInput){
     scoreInput.addEventListener('keydown', function(e){
       if(e.key === 'Enter'){
         e.preventDefault();
-        if(CALC_DONE){
-          resetAll(); if(wordInput) wordInput.focus();
+        if (!CALC_DONE){
+          calc();                  // 첫 Enter는 계산
         } else {
-          calc(); // 첫 Enter는 계산
+          resetAll(); focusWord(); // 계산 후엔 언제든 Enter → 초기화+단어칸
         }
       }
     });
   }
 
-  // 계산 완료 상태면 어디서든 Enter 한 번으로 초기화
   document.addEventListener('keydown', function(e){
-    if(e.key === 'Enter' && CALC_DONE){
-      // 위 개별 핸들러가 처리 못한 경우에 대비한 전역 처리
+    if (e.key === 'Enter' && CALC_DONE){
       e.preventDefault();
-      resetAll(); if(wordInput) wordInput.focus();
+      resetAll(); focusWord();
     }
   });
 });
