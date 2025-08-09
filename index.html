@@ -113,6 +113,19 @@
       </div>
     </section>
 
+    <section class="card" style="margin-bottom:12px; font-size:16px">
+  <h3 style="margin:6px 0 10px">사용 방법</h3>
+  <ul style="margin:0 0 8px 18px; line-height:1.6">
+    <li>입력창에 단어(한글 최대 5글자)와 필요한 기호를 입력합니다.</li>
+    <li><b>Enter</b> → 점수 입력칸으로 이동합니다.</li>
+    <li>게임 점수 입력 후 <b>Enter</b> → 계산합니다.</li>
+    <li>계산이 끝난 뒤에는 <b>어디서든 Enter</b> → 초기화되고 단어 입력칸으로 돌아갑니다.</li>
+  </ul>
+  <div class="hint" style="margin-top:6px"><b>특수기호 입력:</b> 아래 ‘특수기호 복사’ 버튼을 클릭하면 클립보드로 복사됩니다. (붙여넣기 Ctrl/⌘+V)</div>
+  <div class="hint" style="margin-top:6px"><b>계산 규칙:</b> 한글은 최대 5글자, 기호는 상위 5개만 점수에 포함됩니다.</div>
+  <div class="hint" style="margin-top:6px"><b>신호등 기준:</b> 0–2.0=🔴, 2.0–3.5=🟡, 3.5+=🟢</div>
+</section>
+
     <section class="card" style="margin-top:16px">
       <details>
         <summary>점수 규칙 요약 보기</summary>
@@ -160,27 +173,16 @@ function decompose(syllable){
 // ===== Scoring tables =====
 function seqToMap(seq){ const m={}; seq.forEach((ch,i)=> m[ch] = 2**i ); return m; }
 const SCORES = {
-  // 자음박스1-묶음1
   ...seqToMap(["ㄱ","ㄴ","ㄷ","ㄹ","ㅁ","ㅂ","ㅅ"]),
-  // 자음박스1-묶음2
   ...seqToMap(["ㄲ","ㄸ","ㅃ","ㅆ","ㅉ"]),
-  // 자음박스2-단일
   ...seqToMap(["ㅇ","ㅈ","ㅊ","ㅋ","ㅌ","ㅍ","ㅎ"]),
-  // 자음박스2-겹1
   ...seqToMap(["ㄱㅅ","ㄴㅈ","ㄴㅎ"]),
-  // 자음박스2-겹2
   ...seqToMap(["ㄹㄱ","ㄹㅁ","ㄹㅂ","ㄹㅍ","ㄹㅅ","ㅂㅅ"]),
-  // 모음박스1-묶음1
   ...seqToMap(["ㅏ","ㅑ","ㅓ","ㅕ"]),
-  // 모음박스1-묶음2
   ...seqToMap(["ㅐ","ㅒ","ㅔ","ㅖ"]),
-  // 모음박스2-묶음1
   ...seqToMap(["ㅗ","ㅛ","ㅜ","ㅠ","ㅡ","ㅣ"]),
-  // 모음박스2-묶음2
   ...seqToMap(["ㅢ","ㅟ","ㅝ","ㅞ","ㅚ","ㅘ","ㅙ"]),
-  // 특수기호 묶음1
   ...seqToMap([",",".","⋯","!","?","-","~","[","]"]),
-  // 특수기호 묶음2
   ...seqToMap(["◆","♦","♠","♣","♥","★"]),
 };
 function scoreOf(token){ return SCORES[token] ?? 0; }
@@ -221,13 +223,12 @@ function showToast(msg){
 }
 
 // ===== Calculator =====
-let CALC_DONE = false; // 계산 완료 상태
+let CALC_DONE = false;
 
 function calc(){
   const input = document.getElementById('wordInput').value || '';
   const chars = Array.from(input);
 
-  // classify
   const hangulAll = chars.map(c => ({c, d: decompose(c)}));
   const hangul = [];
   const symbols = [];
@@ -236,14 +237,12 @@ function calc(){
     else { if(symbols.length < 5) symbols.push(item.c); }
   }
 
-  // notes
   const limits = document.getElementById('limits');
   const notes = [];
   if(hangul.length < hangulAll.filter(x=>x.d).length) notes.push('한글 5글자까지만 계산했어요.');
   if(symbols.length < hangulAll.filter(x=>!x.d).length) notes.push('기호는 상위 5개만 점수에 포함했어요.');
   limits.textContent = notes.join(' ');
 
-  // table render
   const tbody = document.querySelector('#resultTable tbody');
   tbody.innerHTML = '';
   let total = 0;
@@ -268,7 +267,6 @@ function calc(){
   });
   document.getElementById('resultTable').style.display = hangul.length? 'table':'none';
 
-  // symbols
   const symWrap = document.getElementById('symScoreWrap');
   const symList = document.getElementById('symScoreList');
   const symChips = document.getElementById('symbols');
@@ -285,12 +283,10 @@ function calc(){
   symWrap.style.display = symbols.length? 'block':'none';
   total += symTotal;
 
-  // total
   const totalDiv = document.getElementById('total');
   totalDiv.textContent = `총 점수: ${total.toLocaleString()}점`;
   totalDiv.style.display = (hangul.length || symbols.length)? 'block':'none';
 
-  // ratio badge
   const ratioBox = document.getElementById('ratioBox');
   const ratioBadge = document.getElementById('ratioBadge');
   const gameValRaw = document.getElementById('gameScore').value.trim();
@@ -313,7 +309,7 @@ function calc(){
     ratioBadge.textContent = '';
   }
 
-  CALC_DONE = true; // 계산 완료 플래그 on
+  CALC_DONE = true;
 }
 
 function resetAll(){
@@ -327,50 +323,56 @@ function resetAll(){
   document.getElementById('limits').textContent = '';
   document.getElementById('ratioBox').style.display = 'none';
   document.getElementById('ratioBadge').textContent = '';
-  CALC_DONE = false; // 플래그 off
+  CALC_DONE = false;
 }
 
-// ===== Keyboard flow (final) =====
-// - 단어칸 Enter → 새 라운드 시작(CALC_DONE=false) + 점수칸 포커스
-// - 점수칸 Enter → (계산 전) calc() / (계산 후) resetAll()+단어칸
-// - 어디서든 계산 완료 상태에서 Enter → resetAll()+단어칸
+// ===== Keyboard flow (fixed & continuous) =====
 document.addEventListener('DOMContentLoaded', function(){
   renderSymbols();
 
   const wordInput  = document.getElementById('wordInput');
   const scoreInput = document.getElementById('gameScore');
 
+  function isEnter(e){ return (e.key === 'Enter' || e.key === 'NumpadEnter'); }
   function focusWord(){ if(wordInput){ wordInput.focus(); wordInput.select?.(); } }
 
+  // 새 단어를 타이핑하는 순간, 다음 라운드로 간주
   if (wordInput){
+    wordInput.addEventListener('input', () => { CALC_DONE = false; });
     wordInput.addEventListener('keydown', function(e){
-      if(e.key === 'Enter'){
-        e.preventDefault();
-        CALC_DONE = false;         // 새 라운드 시작
-        if (scoreInput) scoreInput.focus();
-      }
+      if (e.isComposing) return;
+      if (!isEnter(e)) return;
+      e.preventDefault();
+      CALC_DONE = false;                 // 새 라운드 시작
+      if (scoreInput) scoreInput.focus();
     });
   }
 
   if (scoreInput){
     scoreInput.addEventListener('keydown', function(e){
-      if(e.key === 'Enter'){
-        e.preventDefault();
-        if (!CALC_DONE){
-          calc();                  // 첫 Enter는 계산
-        } else {
-          resetAll(); focusWord(); // 계산 후엔 언제든 Enter → 초기화+단어칸
-        }
+      if (e.isComposing) return;
+      if (!isEnter(e)) return;
+      e.preventDefault();
+      if (!CALC_DONE){
+        calc();                          // 첫 Enter는 계산
+      } else {
+        resetAll(); focusWord();         // 계산 후 Enter → 초기화 + 단어칸
       }
     });
   }
 
+  // 전역 핸들러(버블 단계): 포커스가 엉켜도 계산 완료 상태라면 Enter로 초기화
   document.addEventListener('keydown', function(e){
-    if (e.key === 'Enter' && CALC_DONE){
+    if (e.isComposing) return;
+    if (!isEnter(e)) return;
+    // 입력창에서의 Enter는 각자 핸들러가 처리
+    if (document.activeElement === wordInput || document.activeElement === scoreInput) return;
+
+    if (CALC_DONE){
       e.preventDefault();
       resetAll(); focusWord();
     }
-  });
+  }); // ← 캡처 사용 안 함
 });
 </script>
 </body>
